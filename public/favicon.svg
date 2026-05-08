@@ -1,72 +1,52 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="32" height="32">
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 1024 1024">
   <defs>
-    <!-- Background: dark charcoal radial, NOT black -->
-    <radialGradient id="bg" cx="50%" cy="45%" r="65%">
-      <stop offset="0%" stop-color="#211F35"/>
-      <stop offset="100%" stop-color="#161525"/>
-    </radialGradient>
-
-    <!-- Bolt: top-left bright, bottom-right deep shadow -->
-    <linearGradient id="boltFill" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="gbg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#2C2C2E"/>
+      <stop offset="100%" stop-color="#1C1C1E"/>
+    </linearGradient>
+    <linearGradient id="gt0" x1="180" y1="180" x2="180" y2="490" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#C4B5FD"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="gt1" x1="534" y1="180" x2="534" y2="490" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#A78BFA"/>
+      <stop offset="100%" stop-color="#5B21B6"/>
+    </linearGradient>
+    <linearGradient id="gt2" x1="180" y1="534" x2="180" y2="844" gradientUnits="userSpaceOnUse">
       <stop offset="0%"   stop-color="#8B5CF6"/>
-      <stop offset="38%"  stop-color="#5B21B6"/>
-      <stop offset="100%" stop-color="#2D1B69"/>
+      <stop offset="100%" stop-color="#4C1D95"/>
     </linearGradient>
-
-    <!-- Highlight stroke: fades from bright top-left to transparent -->
-    <linearGradient id="hlStroke" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%"   stop-color="#A78BFA" stop-opacity="0.95"/>
-      <stop offset="45%"  stop-color="#7C3AED" stop-opacity="0.4"/>
-      <stop offset="100%" stop-color="#7C3AED" stop-opacity="0"/>
+    <linearGradient id="gt3" x1="534" y1="534" x2="534" y2="844" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#6D28D9"/>
+      <stop offset="100%" stop-color="#2E1065"/>
     </linearGradient>
-
-    <!-- Inner glow filter (#4C1D95 at ~30% opacity) -->
-    <filter id="innerGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur"/>
-      <feColorMatrix in="blur" type="matrix"
-        values="0.3 0 0.4 0 0.07   0 0 0.2 0 0   0.6 0 0.8 0 0.22   0 0 0 7 -2"
-        result="glow"/>
-      <feMerge>
-        <feMergeNode in="glow"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <!-- Drop shadow for depth -->
-    <filter id="dropShadow">
-      <feDropShadow dx="0.5" dy="1.5" stdDeviation="1.5"
-        flood-color="#09071A" flood-opacity="0.85"/>
-    </filter>
-
-    <!-- Clip highlight stroke to top-left half of bolt only -->
-    <clipPath id="tlHalf">
-      <polygon points="0,0 48,0 0,48"/>
-    </clipPath>
+    <linearGradient id="gbolt" x1="430" y1="195" x2="285" y2="820" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#DDD6FE"/>
+      <stop offset="100%" stop-color="#5B21B6"/>
+    </linearGradient>
   </defs>
 
-  <!-- Background -->
-  <rect width="48" height="48" rx="10.5" ry="10.5" fill="url(#bg)"/>
-  <!-- Subtle rim -->
-  <rect x="0.6" y="0.6" width="46.8" height="46.8" rx="10" ry="10" fill="none"
-    stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+  <!-- 1. Background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="230" ry="230" fill="url(#gbg)"/>
 
-  <!-- Original bolt path (vertically centered: translate 0,1 to account for 46-height bolt in 48 square) -->
-  <g transform="translate(0,1)">
+  <!-- 2. Tiles 70% opacity -->
+  <rect x="180" y="180" width="310" height="310" rx="48" ry="48" fill="url(#gt0)" opacity="0.70"/>
+  <rect x="534" y="180" width="310" height="310" rx="48" ry="48" fill="url(#gt1)" opacity="0.70"/>
+  <rect x="180" y="534" width="310" height="310" rx="48" ry="48" fill="url(#gt2)" opacity="0.70"/>
+  <rect x="534" y="534" width="310" height="310" rx="48" ry="48" fill="url(#gt3)" opacity="0.70"/>
 
-    <!-- Drop shadow layer -->
-    <g filter="url(#dropShadow)">
-      <path d="M25.842 44.938c-.664.844-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.183c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.498 0-3.579-1.842-3.579H1.133c-.92 0-1.456-1.04-.92-1.787L9.91.473c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.578 1.842 3.578h11.377c.943 0 1.473 1.088.89 1.832L25.843 44.94z" fill="#07051A" opacity="0.7"/>
-    </g>
+  <!-- 3. Drop shadow -->
+  <polygon points="436,203 361,443 421,443 291,828 586,478 516,478 651,203" fill="#1E0A4E" opacity="0.25"/>
 
-    <!-- Main bolt fill with 3D gradient + inner glow -->
-    <g filter="url(#innerGlow)">
-      <path d="M25.842 44.938c-.664.844-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.183c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.498 0-3.579-1.842-3.579H1.133c-.92 0-1.456-1.04-.92-1.787L9.91.473c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.578 1.842 3.578h11.377c.943 0 1.473 1.088.89 1.832L25.843 44.94z" fill="url(#boltFill)"/>
-    </g>
+  <!-- 4. Bolt body -->
+  <polygon points="430,195 355,435 415,435 285,820 580,470 510,470 645,195" fill="url(#gbolt)"/>
 
-    <!-- Thin bright highlight stroke clipped to top-left half -->
-    <g clip-path="url(#tlHalf)">
-      <path d="M25.842 44.938c-.664.844-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.183c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.498 0-3.579-1.842-3.579H1.133c-.92 0-1.456-1.04-.92-1.787L9.91.473c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.578 1.842 3.578h11.377c.943 0 1.473 1.088.89 1.832L25.843 44.94z" fill="none" stroke="url(#hlStroke)" stroke-width="1.1"/>
-    </g>
+  <!-- 5. Left bright face -->
+  <polygon points="430,195 355,435 415,435" fill="#EDE9FE" opacity="0.80"/>
 
-  </g>
+  <!-- 6. Right shadow face -->
+  <polygon points="615,195 645,195 510,470 480,470" fill="#2E1065" opacity="0.85"/>
+
+  <!-- 7. Highlight line -->
+  <polyline points="645,195 430,195 355,435" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
 </svg>

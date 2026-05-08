@@ -124,16 +124,11 @@ export async function generateExport(userId: string, period: ExportPeriod): Prom
 
   // ── Fetch all tables in parallel ──────────────────────────────────────────
   const [
-    svcRes, amzRes, salahRes, readRes, weekModRes,
+    svcRes, salahRes, readRes, weekModRes,
     habitRes, blocksRes, notesRes, workoutRes, nutRes,
   ] = await Promise.all([
     supabase.from('service_records')
       .select('record_date,emails,calls,meetings_booked,meetings_held,deals,revenue')
-      .eq('user_id', userId).gte('record_date', start).lte('record_date', end)
-      .order('record_date'),
-
-    supabase.from('amazon_records')
-      .select('record_date,products_analyzed,products_listed,orders_count,revenue')
       .eq('user_id', userId).gte('record_date', start).lte('record_date', end)
       .order('record_date'),
 
@@ -182,7 +177,6 @@ export async function generateExport(userId: string, period: ExportPeriod): Prom
   ])
 
   const svc      = svcRes.data      ?? []
-  const amz      = amzRes.data      ?? []
   const salah    = salahRes.data    ?? []
   const reading  = readRes.data     ?? []
   const weekMods = weekModRes.data  ?? []
@@ -212,46 +206,24 @@ export async function generateExport(userId: string, period: ExportPeriod): Prom
   // ── MOTION ────────────────────────────────────────────────────────────────
   ln('MOTION', '───────────────────────────────────────────')
 
-  const totalRevSvc = svc.reduce((s, r) => s + (r.revenue ?? 0), 0)
-  const totalRevAmz = amz.reduce((s, r) => s + (r.revenue ?? 0), 0)
-  const totalRev    = totalRevSvc + totalRevAmz
+  const totalRev = svc.reduce((s, r) => s + (r.revenue ?? 0), 0)
 
-  if (svc.length === 0 && amz.length === 0) {
+  if (svc.length === 0) {
     ln('  No data logged.')
   } else {
-    if (svc.length > 0) {
-      const emails    = svc.reduce((s, r) => s + (r.emails           ?? 0), 0)
-      const calls     = svc.reduce((s, r) => s + (r.calls            ?? 0), 0)
-      const booked    = svc.reduce((s, r) => s + (r.meetings_booked  ?? 0), 0)
-      const held      = svc.reduce((s, r) => s + (r.meetings_held    ?? 0), 0)
-      const deals     = svc.reduce((s, r) => s + (r.deals            ?? 0), 0)
-      ln(
-        '  Service',
-        `    Emails sent      : ${emails}`,
-        `    Calls done       : ${calls}`,
-        `    Meetings booked  : ${booked}`,
-        `    Meetings held    : ${held}`,
-        `    Deals closed     : ${deals}`,
-        `    Revenue          : $${totalRevSvc.toLocaleString()}`,
-      )
-    }
-
-    if (amz.length > 0) {
-      if (svc.length > 0) gap()
-      const analyzed = amz.reduce((s, r) => s + (r.products_analyzed ?? 0), 0)
-      const listed   = amz.reduce((s, r) => s + (r.products_listed   ?? 0), 0)
-      const orders   = amz.reduce((s, r) => s + (r.orders_count      ?? 0), 0)
-      ln(
-        '  Amazon',
-        `    Products analyzed: ${analyzed}`,
-        `    Products listed  : ${listed}`,
-        `    Orders           : ${orders}`,
-        `    Revenue          : $${totalRevAmz.toLocaleString()}`,
-      )
-    }
-
-    gap()
-    ln(`  TOTAL REVENUE : $${totalRev.toLocaleString()}`)
+    const emails = svc.reduce((s, r) => s + (r.emails          ?? 0), 0)
+    const calls  = svc.reduce((s, r) => s + (r.calls           ?? 0), 0)
+    const booked = svc.reduce((s, r) => s + (r.meetings_booked ?? 0), 0)
+    const held   = svc.reduce((s, r) => s + (r.meetings_held   ?? 0), 0)
+    const deals  = svc.reduce((s, r) => s + (r.deals           ?? 0), 0)
+    ln(
+      `    Emails sent      : ${emails}`,
+      `    Calls done       : ${calls}`,
+      `    Meetings booked  : ${booked}`,
+      `    Meetings held    : ${held}`,
+      `    Deals closed     : ${deals}`,
+      `    Revenue          : $${totalRev.toLocaleString()}`,
+    )
   }
   gap()
 

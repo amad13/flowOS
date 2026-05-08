@@ -48,15 +48,9 @@ export default function ExecutionSettingsCard({ settings, onSave }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-2">
-          <span className="text-[9px] text-white/50 uppercase tracking-widest font-semibold">Amazon — weekends</span>
-          <SettingField label="Products / day" value={draft.productsPerDay}    locked={!editing} onChange={v => setDraft(d => ({ ...d, productsPerDay: v    }))} unit="products" accent="purple" />
-        </div>
-        <div className="flex flex-col gap-2">
-          <span className="text-[9px] text-white/50 uppercase tracking-widest font-semibold">Shared — daily</span>
-          <SettingField label="Deep Work / day" value={draft.deepWorkMinPerDay} locked={!editing} onChange={v => setDraft(d => ({ ...d, deepWorkMinPerDay: v }))} unit="min"      accent="purple" />
-        </div>
+      <div className="flex flex-col gap-2">
+        <span className="text-[9px] text-white/50 uppercase tracking-widest font-semibold">Shared — daily</span>
+        <SettingField label="Deep Work / day" value={draft.deepWorkMinPerDay} locked={!editing} onChange={v => setDraft(d => ({ ...d, deepWorkMinPerDay: v }))} unit="min" accent="purple" />
       </div>
 
       {editing && (

@@ -82,12 +82,8 @@ export interface NextAction {
 // --- Execution Settings (Motion – locked between weekly reviews) ---
 
 export interface ExecutionSettings {
-  // Service (weekday targets)
   emailsPerDay:      number
   callsPerDay:       number
-  // Amazon (weekend targets)
-  productsPerDay:    number
-  // Shared
   deepWorkMinPerDay: number
   lastUpdated:       string
 }

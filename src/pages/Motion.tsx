@@ -327,22 +327,16 @@ type ServiceRecord = {
   meetingsBooked: number; meetingsHeld: number; deals: number
   revenue: number
 }
-type AmazonRecord = {
-  date: string
-  productsAnalyzed: number; productsListed: number
-  orders: number; revenue: number
-}
 type WorkSession = {
   id: string; date: string
-  type: 'service' | 'amazon'
-  category: 'building' | 'outreach' | 'calls' | 'follow-ups' | 'meetings' | 'fulfillment' | 'product-analysis' | 'listing' | 'sourcing' | 'feedback'
-  isDeepWork?: boolean   // optional — existing records without this field treated as false
+  type: 'service'
+  category: 'building' | 'outreach' | 'calls' | 'follow-ups' | 'meetings' | 'fulfillment' | 'feedback'
+  isDeepWork?: boolean
   minutes: number; note: string
 }
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 const LS_SVC      = 'motion_service'
-const LS_AMZ      = 'motion_amazon'
 const LS_SESSIONS = 'motion_sessions'
 
 function lsGet<T>(key: string, fb: T): T {
@@ -377,26 +371,20 @@ function fmtMin(m: number): string {
 }
 const blankSvc = (d: string): ServiceRecord =>
   ({ date: d, emails: 0, calls: 0, meetingsBooked: 0, meetingsHeld: 0, deals: 0, revenue: 0 })
-const blankAmz = (d: string): AmazonRecord =>
-  ({ date: d, productsAnalyzed: 0, productsListed: 0, orders: 0, revenue: 0 })
 
 const CAT_LABEL: Record<WorkSession['category'], string> = {
-  'building':        'Building',
-  'outreach':        'Outreach',
-  'calls':           'Calls',
-  'follow-ups':      'Follow-ups',
-  'meetings':        'Meetings',
-  'fulfillment':     'Fulfillment',
-  'product-analysis':'Product Analysis',
-  'listing':         'Listing',
-  'sourcing':        'Sourcing',
-  'feedback':        'Feedback',
+  'building':   'Building',
+  'outreach':   'Outreach',
+  'calls':      'Calls',
+  'follow-ups': 'Follow-ups',
+  'meetings':   'Meetings',
+  'fulfillment':'Fulfillment',
+  'feedback':   'Feedback',
 }
 const SVC_CATS = ['building', 'outreach', 'calls', 'follow-ups', 'meetings', 'fulfillment', 'feedback'] as const
-const AMZ_CATS = ['product-analysis', 'listing', 'sourcing', 'feedback'] as const
 
 // ─── Auto priority system ────────────────────────────────────────────────────
-type PriorityKey = 'calls' | 'emails' | 'products' | 'deep_work'
+type PriorityKey = 'calls' | 'emails' | 'deep_work'
 type AutoPriority = {
   key:        PriorityKey
   label:      string
@@ -409,17 +397,13 @@ type AutoPriority = {
 const AUTO_NEXT_ACTIONS: Record<PriorityKey, string> = {
   calls:     'Make 3 calls (45 min)',
   emails:    'Send 10 emails (30 min)',
-  products:  'Analyze 10 products (45 min)',
   deep_work: 'Deep work session (60 min)',
 }
 
 // ─── Monthly revenue helpers ──────────────────────────────────────────────────
-function buildMonthlyRevMap(svcLog: ServiceRecord[], amzLog: AmazonRecord[]): Map<string, number> {
+function buildMonthlyRevMap(svcLog: ServiceRecord[]): Map<string, number> {
   const m = new Map<string, number>()
   for (const r of svcLog) {
-    const k = r.date.slice(0, 7); m.set(k, (m.get(k) ?? 0) + r.revenue)
-  }
-  for (const r of amzLog) {
     const k = r.date.slice(0, 7); m.set(k, (m.get(k) ?? 0) + r.revenue)
   }
   return m
@@ -439,14 +423,11 @@ function consecutiveMonthsAbove(revMap: Map<string, number>, threshold: number):
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Motion({ settings, onSaveSettings }: Props) {
-  const today        = motionToday()
-  const isWkdayToday = isWeekday(today)
-  const user         = useUser()
+  const today = motionToday()
+  const user  = useUser()
 
   const [activeTab,   setActiveTab]   = useState('overview')
-  const [pipeView,    setPipeView]    = useState<'service' | 'amazon'>('service')
   const [serviceLog,  setServiceLog]  = useState<ServiceRecord[]>(() => lsGet(LS_SVC, []))
-  const [amazonLog,   setAmazonLog]   = useState<AmazonRecord[]>(() => lsGet(LS_AMZ, []))
   const [sessions,    setSessions]    = useState<WorkSession[]>(() => lsGet(LS_SESSIONS, []))
   const [sessionForm, setSessionForm] = useState({
     type:        'service'   as WorkSession['type'],
@@ -455,7 +436,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
     minutes:     30, note: '',
   })
   const [svcRevInput, setSvcRevInput] = useState('')
-  const [amzRevInput, setAmzRevInput] = useState('')
 
   // ── Load all Motion data from Supabase on mount ───────────────────────────
   useEffect(() => {
@@ -480,25 +460,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
         }))
         setServiceLog(mapped)
         lsSet(LS_SVC, mapped)
-      })
-
-    // amazon_records — full history
-    supabase
-      .from('amazon_records')
-      .select('record_date,products_analyzed,products_listed,orders_count,revenue')
-      .eq('user_id', user.id)
-      .then(({ data, error }) => {
-        if (error) { console.error('[motion] fetch amazon_records:', error); return }
-        if (!data?.length) return
-        const mapped: AmazonRecord[] = data.map(r => ({
-          date:             r.record_date,
-          productsAnalyzed: r.products_analyzed ?? 0,
-          productsListed:   r.products_listed   ?? 0,
-          orders:           r.orders_count       ?? 0,
-          revenue:          r.revenue            ?? 0,
-        }))
-        setAmazonLog(mapped)
-        lsSet(LS_AMZ, mapped)
       })
 
     // work_sessions — last 200 for history
@@ -527,7 +488,7 @@ export default function Motion({ settings, onSaveSettings }: Props) {
     // execution_settings — single row per user; hydrate App settings state
     supabase
       .from('execution_settings')
-      .select('emails_per_day,calls_per_day,products_per_day,deep_work_min_per_day')
+      .select('emails_per_day,calls_per_day,deep_work_min_per_day')
       .eq('user_id', user.id)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -536,7 +497,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
         onSaveSettings({
           emailsPerDay:      data.emails_per_day       ?? settings.emailsPerDay,
           callsPerDay:       data.calls_per_day         ?? settings.callsPerDay,
-          productsPerDay:    data.products_per_day      ?? settings.productsPerDay,
           deepWorkMinPerDay: data.deep_work_min_per_day ?? settings.deepWorkMinPerDay,
           lastUpdated:       today,
         })
@@ -546,7 +506,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
 
   // ── Today ──────────────────────────────────────────────────────────────────
   const todaySvc      = serviceLog.find(r => r.date === today) ?? null
-  const todayAmz      = amazonLog.find(r => r.date === today)  ?? null
   const todaySessions = sessions.filter(s => s.date === today)
   const todayDwMin    = todaySessions.reduce((s, r) => s + r.minutes, 0)
 
@@ -556,22 +515,15 @@ export default function Motion({ settings, onSaveSettings }: Props) {
       emails: a.emails + r.emails, calls: a.calls + r.calls,
       deals:  a.deals  + r.deals,  revenue: a.revenue + r.revenue,
     }), { emails: 0, calls: 0, deals: 0, revenue: 0 })
-    const amz = amazonLog.reduce((a, r) => ({
-      productsAnalyzed: a.productsAnalyzed + r.productsAnalyzed,
-      productsListed:   a.productsListed   + r.productsListed,
-      orders: a.orders + r.orders, revenue: a.revenue + r.revenue,
-    }), { productsAnalyzed: 0, productsListed: 0, orders: 0, revenue: 0 })
-    return { svc, amz, totalRevenue: svc.revenue + amz.revenue }
-  }, [serviceLog, amazonLog])
+    return { svc, totalRevenue: svc.revenue }
+  }, [serviceLog])
 
   // ── Current-month revenue (stage validation window) ───────────────────────
-  // Each calendar month is independent — no carry-over between months.
   const currentMonthRev = useMemo(() => {
-    const prefix = new Date().toISOString().slice(0, 7)   // "YYYY-MM"
-    const svc = serviceLog.filter(r => r.date.startsWith(prefix)).reduce((s, r) => s + r.revenue, 0)
-    const amz = amazonLog.filter(r => r.date.startsWith(prefix)).reduce((s, r) => s + r.revenue, 0)
-    return { svc, amz, total: svc + amz }
-  }, [serviceLog, amazonLog])
+    const prefix = new Date().toISOString().slice(0, 7)
+    const total = serviceLog.filter(r => r.date.startsWith(prefix)).reduce((s, r) => s + r.revenue, 0)
+    return { total }
+  }, [serviceLog])
 
   const revPct = Math.min(100, Math.round((currentMonthRev.total / STAGE_REVENUE) * 100))
 
@@ -588,71 +540,43 @@ export default function Motion({ settings, onSaveSettings }: Props) {
 
   // ── Adaptive effective targets ─────────────────────────────────────────────
   const effectiveTargets = useMemo(() => {
-    const wkRecs  = serviceLog.filter(r => isWeekday(r.date)).sort((a, b) => b.date.localeCompare(a.date))
-    const wkeRecs = amazonLog.filter(r => !isWeekday(r.date)).sort((a, b) => b.date.localeCompare(a.date))
-    const last5   = wkRecs.slice(0, 5)
-    const last3   = wkRecs.slice(0, 3)
-    const lastWke = wkeRecs.slice(0, 4)
+    const wkRecs = serviceLog.filter(r => isWeekday(r.date)).sort((a, b) => b.date.localeCompare(a.date))
+    const last5  = wkRecs.slice(0, 5)
+    const last3  = wkRecs.slice(0, 3)
 
-    let emails   = settings.emailsPerDay
-    let calls    = settings.callsPerDay
-    let products = settings.productsPerDay
+    let emails = settings.emailsPerDay
+    let calls  = settings.callsPerDay
 
-    // Service: 5-day avg < 60% → reduce 20%
     if (last5.length >= 3) {
       if (last5.reduce((s, r) => s + r.emails / settings.emailsPerDay, 0) / last5.length < 0.6)
         emails = Math.max(1, Math.round(settings.emailsPerDay * 0.8))
       if (last5.reduce((s, r) => s + r.calls / settings.callsPerDay, 0) / last5.length < 0.6)
         calls = Math.max(1, Math.round(settings.callsPerDay * 0.8))
     }
-    // Service: 3 consecutive days > 110% → increase 20%, clamp
     if (last3.length === 3) {
       if (last3.every(r => r.emails / settings.emailsPerDay > 1.1)) emails = Math.min(50, Math.round(settings.emailsPerDay * 1.2))
       if (last3.every(r => r.calls  / settings.callsPerDay  > 1.1)) calls  = Math.min(15, Math.round(settings.callsPerDay  * 1.2))
     }
 
-    // Amazon analyzed: weekend completion < 50% → reduce 25%; > 120% → increase 25%
-    if (lastWke.length >= 2) {
-      const pAvg = lastWke.reduce((s, r) => s + r.productsAnalyzed / settings.productsPerDay, 0) / lastWke.length
-      if (pAvg < 0.5) products = Math.max(1, Math.round(settings.productsPerDay * 0.75))
-      if (pAvg > 1.2) products = Math.round(settings.productsPerDay * 1.25)
-    }
-
-    // Amazon listed: adapts independently from its own completion history
-    const baseListed = Math.max(1, Math.round(settings.productsPerDay * 0.5))
-    let listed = baseListed
-    if (lastWke.length >= 2) {
-      const lAvg = lastWke.reduce((s, r) => s + r.productsListed / baseListed, 0) / lastWke.length
-      if (lAvg < 0.5) listed = Math.max(1, Math.round(baseListed * 0.75))
-      if (lAvg > 1.2) listed = Math.round(baseListed * 1.25)
-    }
-
-    const listedAdapted  = listed   !== baseListed
-    const anyAdapted     = emails !== settings.emailsPerDay || calls !== settings.callsPerDay || products !== settings.productsPerDay || listedAdapted
+    const anyAdapted = emails !== settings.emailsPerDay || calls !== settings.callsPerDay
 
     return {
-      emailsPerDay:         emails,
-      callsPerDay:          calls,
-      productsPerDay:       products,
-      productsListedPerDay: listed,
-      deepWorkMinPerDay:    settings.deepWorkMinPerDay,
-      emailsAdapted:        emails   !== settings.emailsPerDay,
-      callsAdapted:         calls    !== settings.callsPerDay,
-      productsAdapted:      products !== settings.productsPerDay,
-      listedAdapted,
+      emailsPerDay:      emails,
+      callsPerDay:       calls,
+      deepWorkMinPerDay: settings.deepWorkMinPerDay,
+      emailsAdapted:     emails !== settings.emailsPerDay,
+      callsAdapted:      calls  !== settings.callsPerDay,
       anyAdapted,
     }
-  }, [serviceLog, amazonLog, settings])
+  }, [serviceLog, settings])
 
   // ── Weekly data ───────────────────────────────────────────────────────────
   const weeklyData = useMemo(() => {
     const wkSet   = new Set(weekDays.map(d => d.iso))
     const past    = weekDays.filter(d => !d.isFuture && !d.isToday)
     const pastWkd = past.filter(d => isWeekday(d.iso))
-    const pastWke = past.filter(d => !isWeekday(d.iso))
 
     const svcRecs  = serviceLog.filter(r => wkSet.has(r.date))
-    const amzRecs  = amazonLog.filter(r => wkSet.has(r.date))
     const sessRecs = sessions.filter(s => wkSet.has(s.date))
 
     const svc = svcRecs.reduce((a, r) => ({
@@ -662,12 +586,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
       deals: a.deals + r.deals, revenue: a.revenue + r.revenue,
     }), { emails: 0, calls: 0, meetingsBooked: 0, meetingsHeld: 0, deals: 0, revenue: 0 })
 
-    const amz = amzRecs.reduce((a, r) => ({
-      productsAnalyzed: a.productsAnalyzed + r.productsAnalyzed,
-      productsListed:   a.productsListed   + r.productsListed,
-      orders: a.orders + r.orders, revenue: a.revenue + r.revenue,
-    }), { productsAnalyzed: 0, productsListed: 0, orders: 0, revenue: 0 })
-
     const dwMin = sessRecs.reduce((s, r) => s + r.minutes, 0)
 
     // Conversions
@@ -675,55 +593,37 @@ export default function Motion({ settings, onSaveSettings }: Props) {
     const emailCallToMtg = contacts          > 0 ? Math.round((svc.meetingsBooked / contacts)          * 100) : null
     const mtgBookedHeld  = svc.meetingsBooked > 0 ? Math.round((svc.meetingsHeld   / svc.meetingsBooked) * 100) : null
     const mtgHeldDeal    = svc.meetingsHeld   > 0 ? Math.round((svc.deals          / svc.meetingsHeld)   * 100) : null
-    const analyzedListed = amz.productsAnalyzed > 0 ? Math.round((amz.productsListed / amz.productsAnalyzed) * 100) : null
-    const listedOrder    = amz.productsListed   > 0 ? Math.round((amz.orders          / amz.productsListed)   * 100) : null
 
-    // Per-metric completion rates — each metric vs its own adaptive target
     function pct(actual: number, target: number, n: number): number | null {
       if (n === 0 || target === 0) return null
       return Math.min(100, Math.round((actual / (n * target)) * 100))
     }
-    // Service metrics (weekdays)
-    const emailsPct   = pct(svc.emails,              effectiveTargets.emailsPerDay,         pastWkd.length)
-    const callsPct    = pct(svc.calls,               effectiveTargets.callsPerDay,           pastWkd.length)
-    // deals: target 1 deal per 5 weekdays (0.2/day) — own independent rate
-    const dealsPct    = pastWkd.length > 0 ? Math.min(100, Math.round(svc.deals / (pastWkd.length * 0.2) * 100)) : null
-    // Amazon metrics (weekends)
-    const productsPct = pct(amz.productsAnalyzed,    effectiveTargets.productsPerDay,        pastWke.length)
-    const listedPct   = pct(amz.productsListed,      effectiveTargets.productsListedPerDay,  pastWke.length)
-    // orders: target 1 order per 2 weekend days (0.5/day) — own independent rate
-    const ordersPct   = pastWke.length > 0 ? Math.min(100, Math.round(amz.orders / (pastWke.length * 0.5) * 100)) : null
-    // Shared
-    const dwPct       = pct(dwMin,                   effectiveTargets.deepWorkMinPerDay,     past.length)
+    const emailsPct = pct(svc.emails, effectiveTargets.emailsPerDay, pastWkd.length)
+    const callsPct  = pct(svc.calls,  effectiveTargets.callsPerDay,  pastWkd.length)
+    const dealsPct  = pastWkd.length > 0 ? Math.min(100, Math.round(svc.deals / (pastWkd.length * 0.2) * 100)) : null
+    const dwPct     = pct(dwMin, effectiveTargets.deepWorkMinPerDay, past.length)
 
-    // Weakest = single metric with lowest completion rate (across all 7)
     const scored = [
-      { label: 'Emails',    pct: emailsPct   },
-      { label: 'Calls',     pct: callsPct    },
-      { label: 'Deals',     pct: dealsPct    },
-      { label: 'Analyzed',  pct: productsPct },
-      { label: 'Listed',    pct: listedPct   },
-      { label: 'Orders',    pct: ordersPct   },
-      { label: 'Deep Work', pct: dwPct       },
+      { label: 'Emails',    pct: emailsPct },
+      { label: 'Calls',     pct: callsPct  },
+      { label: 'Deals',     pct: dealsPct  },
+      { label: 'Deep Work', pct: dwPct     },
     ].filter((c): c is { label: string; pct: number } => c.pct !== null)
     const weakest = scored.length === 0 ? null : scored.reduce((a, b) => a.pct <= b.pct ? a : b)
 
     const missed: string[] = []
     for (const day of past) {
       const s  = serviceLog.find(r => r.date === day.iso)
-      const az = amazonLog.find(r => r.date === day.iso)
       const dw = sessions.filter(r => r.date === day.iso).reduce((sum, r) => sum + r.minutes, 0)
       if (isWeekday(day.iso)) {
-        if (!s || s.emails < effectiveTargets.emailsPerDay)  missed.push(`Emails — ${day.label} ${day.num}`)
-        if (!s || s.calls  < effectiveTargets.callsPerDay)   missed.push(`Calls — ${day.label} ${day.num}`)
-      } else {
-        if (!az || az.productsAnalyzed < effectiveTargets.productsPerDay) missed.push(`Products — ${day.label} ${day.num}`)
+        if (!s || s.emails < effectiveTargets.emailsPerDay) missed.push(`Emails — ${day.label} ${day.num}`)
+        if (!s || s.calls  < effectiveTargets.callsPerDay)  missed.push(`Calls — ${day.label} ${day.num}`)
       }
       if (dw < effectiveTargets.deepWorkMinPerDay) missed.push(`Deep Work — ${day.label} ${day.num}`)
     }
 
-    return { svc, amz, dwMin, emailCallToMtg, mtgBookedHeld, mtgHeldDeal, analyzedListed, listedOrder, emailsPct, callsPct, dealsPct, productsPct, listedPct, ordersPct, dwPct, weakest, missed, pastWkdCount: pastWkd.length, pastWkeCount: pastWke.length }
-  }, [serviceLog, amazonLog, sessions, weekDays, effectiveTargets])
+    return { svc, dwMin, emailCallToMtg, mtgBookedHeld, mtgHeldDeal, emailsPct, callsPct, dealsPct, dwPct, weakest, missed, pastWkdCount: pastWkd.length }
+  }, [serviceLog, sessions, weekDays, effectiveTargets])
 
   // ── Weekly history (last 4 complete Sun–Sat weeks) ────────────────────────
   const weeklyHistory = useMemo(() => {
@@ -740,24 +640,19 @@ export default function Motion({ settings, onSaveSettings }: Props) {
         (a, r) => ({ emails: a.emails + r.emails, calls: a.calls + r.calls, deals: a.deals + r.deals, revenue: a.revenue + r.revenue }),
         { emails: 0, calls: 0, deals: 0, revenue: 0 },
       )
-      const amz = amazonLog.filter(r => daySet.has(r.date)).reduce(
-        (a, r) => ({ analyzed: a.analyzed + r.productsAnalyzed, listed: a.listed + r.productsListed, orders: a.orders + r.orders, revenue: a.revenue + r.revenue }),
-        { analyzed: 0, listed: 0, orders: 0, revenue: 0 },
-      )
-      const hasData  = svc.emails > 0 || svc.calls > 0 || svc.deals > 0 || amz.analyzed > 0
-      const totalRev = svc.revenue + amz.revenue
-      // Stage 1 requirements met this week?
-      const s1Emails = svc.emails >= Math.round(STAGE_SVC_EMAILS / 52)   // ~10/wk
-      const s1Calls  = svc.calls  >= Math.round(STAGE_SVC_CALLS  / 52)   // ~14/wk
-      const s1Deals  = svc.deals  >= 0                                    // any deal counts
-      return { weekStart: sunIso, weekEnd: satIso, svc, amz, totalRev, hasData, s1Emails, s1Calls, s1Deals }
+      const hasData  = svc.emails > 0 || svc.calls > 0 || svc.deals > 0
+      const totalRev = svc.revenue
+      const s1Emails = svc.emails >= Math.round(STAGE_SVC_EMAILS / 52)
+      const s1Calls  = svc.calls  >= Math.round(STAGE_SVC_CALLS  / 52)
+      const s1Deals  = svc.deals  >= 0
+      return { weekStart: sunIso, weekEnd: satIso, svc, totalRev, hasData, s1Emails, s1Calls, s1Deals }
     })
-  }, [serviceLog, amazonLog])
+  }, [serviceLog])
 
   // ── Motion stage system ───────────────────────────────────────────────────
   const monthlyRevMap = useMemo(
-    () => buildMonthlyRevMap(serviceLog, amazonLog),
-    [serviceLog, amazonLog],
+    () => buildMonthlyRevMap(serviceLog),
+    [serviceLog],
   )
 
   const currentMotionStage = useMemo((): MotionStageDef => {
@@ -823,7 +718,7 @@ export default function Motion({ settings, onSaveSettings }: Props) {
 
   // ── Stage-aware weakest area (required + focus implemented metrics only) ───
   const motionWeakestArea = useMemo(() => {
-    const wRev       = weeklyData.svc.revenue + weeklyData.amz.revenue
+    const wRev       = weeklyData.svc.revenue
     const wRevTarget = currentMotionStage.revenueThreshold / 4.3   // approx weekly portion
     const mtgBkdTgt  = Math.max(1, Math.round((weeklyData.svc.emails + weeklyData.svc.calls) * 0.1))
     const mtgHeldTgt = Math.max(1, weeklyData.svc.meetingsBooked)
@@ -862,18 +757,12 @@ export default function Motion({ settings, onSaveSettings }: Props) {
     function mk(key: PriorityKey, label: string, done: number, target: number): AutoPriority {
       return { key, label, nextAction: AUTO_NEXT_ACTIONS[key], done, target, pct: Math.min(100, Math.round(done / target * 100)), complete: done >= target }
     }
-    if (isWkdayToday) {
-      const cDone = todaySvc?.calls  ?? 0; const cTgt = effectiveTargets.callsPerDay
-      const eDone = todaySvc?.emails ?? 0; const eTgt = effectiveTargets.emailsPerDay
-      if (cDone < cTgt) return mk('calls',     'Calls',     cDone,      cTgt)
-      if (eDone < eTgt) return mk('emails',    'Emails',    eDone,      eTgt)
-      return                  mk('deep_work', 'Deep Work', todayDwMin, effectiveTargets.deepWorkMinPerDay)
-    } else {
-      const pDone = todayAmz?.productsAnalyzed ?? 0; const pTgt = effectiveTargets.productsPerDay
-      if (pDone < pTgt) return mk('products',  'Products',  pDone,      pTgt)
-      return                  mk('deep_work', 'Deep Work', todayDwMin, effectiveTargets.deepWorkMinPerDay)
-    }
-  }, [isWkdayToday, todaySvc, todayAmz, todayDwMin, effectiveTargets])
+    const cDone = todaySvc?.calls  ?? 0; const cTgt = effectiveTargets.callsPerDay
+    const eDone = todaySvc?.emails ?? 0; const eTgt = effectiveTargets.emailsPerDay
+    if (cDone < cTgt) return mk('calls',     'Calls',     cDone,      cTgt)
+    if (eDone < eTgt) return mk('emails',    'Emails',    eDone,      eTgt)
+    return                  mk('deep_work', 'Deep Work', todayDwMin, effectiveTargets.deepWorkMinPerDay)
+  }, [todaySvc, todayDwMin, effectiveTargets])
 
   // ── Session history ───────────────────────────────────────────────────────
   const sessionHistory = useMemo(() => {
@@ -893,34 +782,23 @@ export default function Motion({ settings, onSaveSettings }: Props) {
 
   // ── Daily score: avg of per-metric completion rates for today ────────────
   const todayScore = useMemo(() => {
-    const metrics: number[] = []
-    // Deep work — always tracked regardless of day type
-    metrics.push(Math.min(todayDwMin / effectiveTargets.deepWorkMinPerDay, 1) * 100)
-    if (isWkdayToday) {
-      // Service day: emails and calls each contribute independently
-      metrics.push(Math.min((todaySvc?.emails ?? 0) / effectiveTargets.emailsPerDay, 1) * 100)
-      metrics.push(Math.min((todaySvc?.calls  ?? 0) / effectiveTargets.callsPerDay,  1) * 100)
-    } else {
-      // Amazon day: analyzed and listed each contribute independently
-      metrics.push(Math.min((todayAmz?.productsAnalyzed ?? 0) / effectiveTargets.productsPerDay,       1) * 100)
-      metrics.push(Math.min((todayAmz?.productsListed   ?? 0) / effectiveTargets.productsListedPerDay, 1) * 100)
-    }
+    const metrics: number[] = [
+      Math.min(todayDwMin / effectiveTargets.deepWorkMinPerDay, 1) * 100,
+      Math.min((todaySvc?.emails ?? 0) / effectiveTargets.emailsPerDay, 1) * 100,
+      Math.min((todaySvc?.calls  ?? 0) / effectiveTargets.callsPerDay,  1) * 100,
+    ]
     return Math.round(metrics.reduce((s, v) => s + v, 0) / metrics.length)
-  }, [isWkdayToday, todaySvc, todayAmz, todayDwMin, effectiveTargets])
+  }, [todaySvc, todayDwMin, effectiveTargets])
 
   // ── Ineffective work: high time + low output ──────────────────────────────
   const ineffectiveWorkFlag = useMemo(() => {
-    if (todayDwMin < 60) return false  // threshold: 60+ min logged
-    if (isWkdayToday) {
-      const inputPct = (
-        (todaySvc?.emails ?? 0) / effectiveTargets.emailsPerDay +
-        (todaySvc?.calls  ?? 0) / effectiveTargets.callsPerDay
-      ) / 2
-      return inputPct < 0.3
-    } else {
-      return ((todayAmz?.productsAnalyzed ?? 0) / effectiveTargets.productsPerDay) < 0.3
-    }
-  }, [todayDwMin, isWkdayToday, todaySvc, todayAmz, effectiveTargets])
+    if (todayDwMin < 60) return false
+    const inputPct = (
+      (todaySvc?.emails ?? 0) / effectiveTargets.emailsPerDay +
+      (todaySvc?.calls  ?? 0) / effectiveTargets.callsPerDay
+    ) / 2
+    return inputPct < 0.3
+  }, [todayDwMin, todaySvc, effectiveTargets])
 
   // ── Today priority: one metric, closest to revenue, below 80% ────────────
   const todayPriority = useMemo(() => {
@@ -941,46 +819,27 @@ export default function Motion({ settings, onSaveSettings }: Props) {
       return { metric, rate, field, done, target, remaining, isIncomplete, action, intensity, blockDuration, blockTarget, blockUnit }
     }
 
-    if (isWkdayToday) {
-      const eDone = todaySvc?.emails ?? 0;  const eTarget = effectiveTargets.emailsPerDay
-      const cDone = todaySvc?.calls  ?? 0;  const cTarget = effectiveTargets.callsPerDay
-      const emailsRate = Math.min(100, Math.round(eDone / eTarget * 100))
-      const callsRate  = Math.min(100, Math.round(cDone / cTarget * 100))
+    const eDone = todaySvc?.emails ?? 0;  const eTarget = effectiveTargets.emailsPerDay
+    const cDone = todaySvc?.calls  ?? 0;  const cTarget = effectiveTargets.callsPerDay
+    const emailsRate = Math.min(100, Math.round(eDone / eTarget * 100))
+    const callsRate  = Math.min(100, Math.round(cDone / cTarget * 100))
 
-      const { svc, pastWkdCount } = weeklyData
-      const contacts    = svc.emails + svc.calls
-      const mtgBkdTgt   = Math.max(1, Math.round(contacts * 0.10))
-      const mtgHeldTgt  = Math.max(1, Math.round(svc.meetingsBooked * 0.80))
-      const dealsTgt    = Math.max(1, Math.round(pastWkdCount * 0.20))
-      const mtgBkdRate  = contacts           > 0 ? Math.min(100, Math.round(svc.meetingsBooked / mtgBkdTgt  * 100)) : null
-      const mtgHeldRate = svc.meetingsBooked > 0 ? Math.min(100, Math.round(svc.meetingsHeld   / mtgHeldTgt * 100)) : null
-      const dealsRate   = weeklyData.dealsPct
+    const { svc, pastWkdCount } = weeklyData
+    const contacts    = svc.emails + svc.calls
+    const mtgBkdTgt   = Math.max(1, Math.round(contacts * 0.10))
+    const mtgHeldTgt  = Math.max(1, Math.round(svc.meetingsBooked * 0.80))
+    const dealsTgt    = Math.max(1, Math.round(pastWkdCount * 0.20))
+    const mtgBkdRate  = contacts           > 0 ? Math.min(100, Math.round(svc.meetingsBooked / mtgBkdTgt  * 100)) : null
+    const mtgHeldRate = svc.meetingsBooked > 0 ? Math.min(100, Math.round(svc.meetingsHeld   / mtgHeldTgt * 100)) : null
+    const dealsRate   = weeklyData.dealsPct
 
-      // Waterfall — closest to revenue first
-      if (dealsRate   !== null && dealsRate   < T) return mk('Deals',           dealsRate,   'deals',          svc.deals,          dealsTgt,   'Follow up on held meetings. Close.',        1,  'deal'           )
-      if (mtgHeldRate !== null && mtgHeldRate < T) return mk('Meetings held',   mtgHeldRate, 'meetingsHeld',   svc.meetingsHeld,   mtgHeldTgt, 'Reach out to booked contacts. Hold the call.', 1, 'meeting held'  )
-      if (mtgBkdRate  !== null && mtgBkdRate  < T) return mk('Meetings booked', mtgBkdRate,  'meetingsBooked', svc.meetingsBooked, mtgBkdTgt,  'Follow up / book calls',                    1,  'meeting booked')
-      if (callsRate   < T) return mk('Calls',  callsRate,  'calls',  cDone, cTarget, `Make ${Math.min(3,  Math.max(1, cTarget - cDone))} calls`,   3,  'calls'  )
-      if (emailsRate  < T) return mk('Emails', emailsRate, 'emails', eDone, eTarget, `Send ${Math.min(10, Math.max(1, eTarget - eDone))} emails`,  10, 'emails' )
-      return null
-
-    } else {
-      const aDone = todayAmz?.productsAnalyzed ?? 0;  const aTarget = effectiveTargets.productsPerDay
-      const lDone = todayAmz?.productsListed   ?? 0;  const lTarget = effectiveTargets.productsListedPerDay
-      const analyzedRate = Math.min(100, Math.round(aDone / aTarget * 100))
-      const listedRate   = Math.min(100, Math.round(lDone / lTarget * 100))
-
-      const { amz } = weeklyData
-      const ordersTgt  = Math.max(1, Math.round(weeklyData.pastWkeCount * 0.50))
-      const ordersRate = amz.productsListed > 0 ? Math.min(100, Math.round(amz.orders / (amz.productsListed * 0.10) * 100)) : null
-
-      // Waterfall — closest to revenue first
-      if (ordersRate   !== null && ordersRate   < T) return mk('Orders',             ordersRate,   'orders',           amz.orders, ordersTgt, 'Review listings. Drive sales.',                         1,  'order'   )
-      if (listedRate   < T) return mk('Products listed',   listedRate,   'productsListed',   lDone, lTarget, `List ${Math.min(5,  Math.max(1, lTarget - lDone))} products`,    5,  'listings')
-      if (analyzedRate < T) return mk('Products analyzed', analyzedRate, 'productsAnalyzed', aDone, aTarget, `Analyze ${Math.min(10, Math.max(1, aTarget - aDone))} products`, 10, 'products')
-      return null
-    }
-  }, [isWkdayToday, todaySvc, todayAmz, weeklyData, effectiveTargets])
+    if (dealsRate   !== null && dealsRate   < T) return mk('Deals',           dealsRate,   'deals',          svc.deals,          dealsTgt,   'Follow up on held meetings. Close.',           1, 'deal'           )
+    if (mtgHeldRate !== null && mtgHeldRate < T) return mk('Meetings held',   mtgHeldRate, 'meetingsHeld',   svc.meetingsHeld,   mtgHeldTgt, 'Reach out to booked contacts. Hold the call.', 1, 'meeting held'   )
+    if (mtgBkdRate  !== null && mtgBkdRate  < T) return mk('Meetings booked', mtgBkdRate,  'meetingsBooked', svc.meetingsBooked, mtgBkdTgt,  'Follow up / book calls',                       1, 'meeting booked' )
+    if (callsRate   < T) return mk('Calls',  callsRate,  'calls',  cDone, cTarget, `Make ${Math.min(3,  Math.max(1, cTarget - cDone))} calls`,  3,  'calls'  )
+    if (emailsRate  < T) return mk('Emails', emailsRate, 'emails', eDone, eTarget, `Send ${Math.min(10, Math.max(1, eTarget - eDone))} emails`, 10, 'emails' )
+    return null
+  }, [todaySvc, weeklyData, effectiveTargets])
 
   // ── Anti-escape: score penalty + warning ──────────────────────────────────
   const priorityIncomplete = todayPriority !== null && todayPriority.rate < 80
@@ -1020,34 +879,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
   function logSvcRevenue() {
     const n = parseFloat(svcRevInput); if (isNaN(n) || n <= 0) return
     logSvc('revenue', n); setSvcRevInput('')
-  }
-  function logAmz(field: keyof Omit<AmazonRecord, 'date'>, amount = 1) {
-    const current = amazonLog.find(r => r.date === today) ?? blankAmz(today)
-    const next: AmazonRecord = { ...current, [field]: Math.max(0, (current[field] as number) + amount) }
-
-    setAmazonLog(prev => {
-      const rec     = prev.find(r => r.date === today) ?? blankAmz(today)
-      const updated = [...prev.filter(r => r.date !== today), { ...rec, [field]: (rec[field] as number) + amount }]
-      lsSet(LS_AMZ, updated); return updated
-    })
-
-    if (user) {
-      supabase
-        .from('amazon_records')
-        .upsert({
-          user_id:           user.id,
-          record_date:       today,
-          products_analyzed: next.productsAnalyzed,
-          products_listed:   next.productsListed,
-          orders_count:      next.orders,
-          revenue:           next.revenue,
-        }, { onConflict: 'user_id,record_date' })
-        .then(({ error }) => { if (error) console.error('[motion] upsert amazon_records:', error) })
-    }
-  }
-  function logAmzRevenue() {
-    const n = parseFloat(amzRevInput); if (isNaN(n) || n <= 0) return
-    logAmz('revenue', n); setAmzRevInput('')
   }
   function logSession() {
     if (sessionForm.minutes <= 0) return
@@ -1089,7 +920,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
           user_id:               user.id,
           emails_per_day:        updated.emailsPerDay,
           calls_per_day:         updated.callsPerDay,
-          products_per_day:      updated.productsPerDay,
           deep_work_min_per_day: updated.deepWorkMinPerDay,
         }, { onConflict: 'user_id' })
         .then(({ error }) => { if (error) console.error('[motion] upsert execution_settings:', error) })
@@ -1773,19 +1603,11 @@ export default function Motion({ settings, onSaveSettings }: Props) {
               <span className="text-xs font-semibold tracking-widest text-white/40 uppercase">This Month's Revenue</span>
               <span className="text-xs text-emerald-400/60 font-mono">{revPct}% of ${STAGE_REVENUE.toLocaleString()}</span>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: 'Service', val: currentMonthRev.svc   },
-                { label: 'Amazon',  val: currentMonthRev.amz   },
-                { label: 'Total',   val: currentMonthRev.total  },
-              ].map(item => (
-                <div key={item.label} className="flex flex-col gap-0.5">
-                  <span className="text-[9px] text-white/50 uppercase tracking-widest">{item.label}</span>
-                  <span className={`text-lg font-bold tabular-nums ${item.label === 'Total' ? 'text-white/65' : 'text-emerald-400'}`}>
-                    ${item.val.toLocaleString()}
-                  </span>
-                </div>
-              ))}
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[9px] text-white/50 uppercase tracking-widest">Revenue</span>
+              <span className="text-lg font-bold tabular-nums text-emerald-400">
+                ${currentMonthRev.total.toLocaleString()}
+              </span>
             </div>
             <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
               <div className="h-full bg-emerald-500/60 rounded-full transition-all" style={{ width: `${revPct}%` }} />
@@ -1906,20 +1728,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
                       )
                     })}
                   </div>
-                  {/* Amazon track */}
-                  <span className="text-[8px] text-white/42 uppercase tracking-widest mt-1">Amazon</span>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      { label: 'Analyzed', value: stageTotals.amz.productsAnalyzed },
-                      { label: 'Listed',   value: stageTotals.amz.productsListed   },
-                      { label: 'Orders',   value: stageTotals.amz.orders            },
-                    ].map(item => (
-                      <div key={item.label} className="flex flex-col gap-0.5 px-2.5 py-1.5 rounded-lg border border-white/6 bg-white/3">
-                        <span className="text-[8px] text-white/45 uppercase tracking-widest">{item.label}</span>
-                        <span className="text-sm font-bold text-white/50 tabular-nums">{item.value.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
             )
@@ -1936,11 +1744,7 @@ export default function Motion({ settings, onSaveSettings }: Props) {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <span className="text-[9px] text-white/55 uppercase tracking-widest font-semibold">Today Priority</span>
-                  <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
-                    isWkdayToday
-                      ? 'border-blue-500/15 bg-blue-500/8 text-blue-400/60'
-                      : 'border-amber-500/15 bg-amber-500/8 text-amber-400/60'
-                  }`}>{isWkdayToday ? 'Service' : 'Amazon'}</span>
+                  <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full border border-blue-500/15 bg-blue-500/8 text-blue-400/60">Service</span>
                 </div>
 
                 {/* Priority metric + progress */}
@@ -1996,23 +1800,12 @@ export default function Motion({ settings, onSaveSettings }: Props) {
                 <span className={`text-[10px] font-mono tabular-nums font-semibold ${
                   displayScore >= 70 ? 'text-emerald-400/65' : displayScore >= 40 ? 'text-amber-400/65' : 'text-red-400/65'
                 }`}>{displayScore}%</span>
-                <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
-                  isWkdayToday ? 'border-blue-500/15 bg-blue-500/8 text-blue-400/60' : 'border-amber-500/15 bg-amber-500/8 text-amber-400/60'
-                }`}>{isWkdayToday ? 'Service day' : 'Amazon day'}</span>
+                <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full border border-blue-500/15 bg-blue-500/8 text-blue-400/60">Service day</span>
               </div>
             </div>
             <DefRow label="Deep Work" done={todayDwMin} target={effectiveTargets.deepWorkMinPerDay} isTime />
-            {isWkdayToday ? (
-              <>
-                <DefRow label="Emails" done={todaySvc?.emails ?? 0} target={effectiveTargets.emailsPerDay} />
-                <DefRow label="Calls"  done={todaySvc?.calls  ?? 0} target={effectiveTargets.callsPerDay}  />
-              </>
-            ) : (
-              <>
-                <DefRow label="Products analyzed" done={todayAmz?.productsAnalyzed ?? 0} target={effectiveTargets.productsPerDay} />
-                <DefRow label="Products listed"   done={todayAmz?.productsListed   ?? 0} target={effectiveTargets.productsListedPerDay} />
-              </>
-            )}
+            <DefRow label="Emails" done={todaySvc?.emails ?? 0} target={effectiveTargets.emailsPerDay} />
+            <DefRow label="Calls"  done={todaySvc?.calls  ?? 0} target={effectiveTargets.callsPerDay}  />
           </div>
 
         </div>
@@ -2037,20 +1830,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
           <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-4">
             <span className="text-xs font-semibold tracking-widest text-white/40 uppercase">Log Session</span>
 
-            <div className="flex flex-col gap-2">
-              <span className="text-[10px] text-white/55 uppercase tracking-widest">Type</span>
-              <div className="flex gap-2">
-                {(['service', 'amazon'] as const).map(t => (
-                  <button key={t} onClick={() => setSessionForm(f => ({
-                    ...f, type: t,
-                    category: t === 'service' ? 'outreach' : 'product-analysis'
-                  }))}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors capitalize ${
-                      sessionForm.type === t ? 'border-emerald-500/30 bg-emerald-500/12 text-emerald-400' : 'border-white/10 text-white/35 hover:text-white/55 bg-white/3'
-                    }`}>{t}</button>
-                ))}
-              </div>
-            </div>
 
             {/* Deep Work toggle */}
             <button
@@ -2069,7 +1848,7 @@ export default function Motion({ settings, onSaveSettings }: Props) {
             <div className="flex flex-col gap-2">
               <span className="text-[10px] text-white/55 uppercase tracking-widest">Category</span>
               <div className="flex flex-wrap gap-2">
-                {(sessionForm.type === 'service' ? SVC_CATS : AMZ_CATS).map(c => (
+                {SVC_CATS.map(c => (
                   <button key={c} onClick={() => setSessionForm(f => ({ ...f, category: c }))}
                     className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
                       sessionForm.category === c ? 'border-emerald-500/30 bg-emerald-500/12 text-emerald-400' : 'border-white/10 text-white/35 hover:text-white/55 bg-white/3'
@@ -2167,20 +1946,8 @@ export default function Motion({ settings, onSaveSettings }: Props) {
       {activeTab === 'pipeline' && (
         <div className="flex flex-col gap-4">
 
-          {/* Toggle */}
-          <div className="flex rounded-lg border border-white/10 overflow-hidden">
-            {(['service', 'amazon'] as const).map(v => (
-              <button key={v} onClick={() => setPipeView(v)}
-                className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${
-                  pipeView === v ? 'bg-white/10 text-white' : 'text-white/35 hover:text-white/55 hover:bg-white/5'
-                }`}>
-                {v === 'service' ? 'Service — weekdays' : 'Amazon — weekends'}
-              </button>
-            ))}
-          </div>
-
           {/* ── SERVICE PIPELINE ── */}
-          {pipeView === 'service' && (() => {
+          {(() => {
             return (
             <div className="flex flex-col gap-4">
 
@@ -2318,152 +2085,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
             )
           })()}
 
-          {/* ── AMAZON PIPELINE ── */}
-          {pipeView === 'amazon' && (() => {
-            return (
-            <div className="flex flex-col gap-4">
-
-              {/* Inputs */}
-              <div className="rounded-xl border border-white/10 bg-white/5 px-4 divide-y divide-white/5">
-                <div className="py-3"><span className="text-xs font-semibold tracking-widest text-white/40 uppercase">Inputs</span></div>
-                {(() => {
-                  const done    = todayAmz?.productsAnalyzed ?? 0
-                  const target  = effectiveTargets.productsPerDay
-                  const hit     = done >= target
-                  const isPrior = todayPriority?.field === 'productsAnalyzed'
-                  return (
-                    <div className={`flex items-center gap-3 py-3.5 ${isPrior ? '-mx-4 px-4 bg-amber-500/6 border-l-2 border-amber-400/40' : ''}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${hit ? 'bg-emerald-500' : done > 0 ? 'bg-amber-400/60' : 'bg-white/15'}`} />
-                      <div className="flex-1 flex items-center gap-2">
-                        <span className={`text-sm font-semibold ${hit ? 'text-emerald-400/70' : 'text-white/70'}`}>Products analyzed</span>
-                        <span className="text-[9px] text-white/45">target {target}</span>
-                        {isPrior && <span className="text-[9px] px-1.5 py-0.5 rounded border border-amber-500/25 bg-amber-500/10 text-amber-400/70 font-semibold">Priority</span>}
-                      </div>
-                      <span className={`text-sm font-bold tabular-nums ${hit ? 'text-emerald-400/70' : done > 0 ? 'text-white/55' : 'text-white/50'}`}>{done}/{target}</span>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => logAmz('productsAnalyzed', -1)} disabled={done <= 0}
-                          className="px-2.5 py-1.5 rounded-lg border border-white/12 text-white/35 bg-white/4 text-xs font-semibold hover:bg-white/8 disabled:opacity-30 transition-colors">
-                          −1
-                        </button>
-                        <button onClick={() => logAmz('productsAnalyzed')}
-                          className="px-2.5 py-1.5 rounded-lg border border-emerald-500/25 text-emerald-400/70 bg-emerald-500/8 text-xs font-semibold hover:bg-emerald-500/15 transition-colors">
-                          +1
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })()}
-              </div>
-
-              {/* Flow */}
-              <div className="rounded-xl border border-white/10 bg-white/5 px-4 divide-y divide-white/5">
-                <div className="py-3"><span className="text-xs font-semibold tracking-widest text-white/40 uppercase">Flow</span></div>
-                {([
-                  { label: 'Products listed', done: todayAmz?.productsListed ?? 0, field: 'productsListed' as const },
-                  { label: 'Orders received', done: todayAmz?.orders          ?? 0, field: 'orders'          as const },
-                ] as const).map(row => {
-                  const isPrior = todayPriority?.field === row.field
-                  return (
-                    <div key={row.label} className={`flex items-center gap-3 py-3.5 ${isPrior ? '-mx-4 px-4 bg-amber-500/6 border-l-2 border-amber-400/40' : ''}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.done > 0 ? 'bg-emerald-500' : 'bg-white/15'}`} />
-                      <div className="flex-1 flex items-center gap-2">
-                        <span className={`text-sm font-semibold ${row.done > 0 ? 'text-emerald-400/70' : 'text-white/70'}`}>{row.label}</span>
-                        {isPrior && <span className="text-[9px] px-1.5 py-0.5 rounded border border-amber-500/25 bg-amber-500/10 text-amber-400/70 font-semibold">Priority</span>}
-                      </div>
-                      <span className={`text-sm font-bold tabular-nums ${row.done > 0 ? 'text-emerald-400/70' : 'text-white/50'}`}>{row.done}</span>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => logAmz(row.field, -1)} disabled={row.done <= 0}
-                          className="px-2.5 py-1.5 rounded-lg border border-white/12 text-white/35 bg-white/4 text-xs font-semibold hover:bg-white/8 disabled:opacity-30 transition-colors">
-                          −1
-                        </button>
-                        <button onClick={() => logAmz(row.field)}
-                          className="px-2.5 py-1.5 rounded-lg border border-emerald-500/25 text-emerald-400/70 bg-emerald-500/8 text-xs font-semibold hover:bg-emerald-500/15 transition-colors">
-                          +1
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Revenue */}
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-3">
-                <span className="text-xs font-semibold tracking-widest text-white/40 uppercase">Revenue</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-lg border border-white/8 bg-white/3 px-3 py-2.5 flex flex-col gap-0.5">
-                    <span className="text-[9px] text-white/50 uppercase tracking-widest">Today</span>
-                    <span className="text-lg font-bold text-emerald-400">${(todayAmz?.revenue ?? 0).toLocaleString()}</span>
-                  </div>
-                  <div className="rounded-lg border border-white/8 bg-white/3 px-3 py-2.5 flex flex-col gap-0.5">
-                    <span className="text-[9px] text-white/50 uppercase tracking-widest">Cumulative</span>
-                    <span className="text-lg font-bold text-white/55">${stageTotals.amz.revenue.toLocaleString()}</span>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <input type="number" step={0.01} value={amzRevInput}
-                    onChange={e => setAmzRevInput(e.target.value)} placeholder="Amount ($)"
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-white/20 transition-colors" />
-                  <button onClick={logAmzRevenue}
-                    className="px-3 py-2 rounded-lg border border-emerald-500/25 bg-emerald-500/8 text-emerald-400/70 text-sm font-semibold hover:bg-emerald-500/15 transition-colors shrink-0">
-                    +Add
-                  </button>
-                  <button
-                    onClick={() => {
-                      const n = parseFloat(amzRevInput)
-                      if (isNaN(n) || n < 0) return
-                      logAmz('revenue', n - (todayAmz?.revenue ?? 0))
-                      setAmzRevInput('')
-                    }}
-                    className="px-3 py-2 rounded-lg border border-white/12 bg-white/4 text-white/40 text-sm font-semibold hover:bg-white/8 transition-colors shrink-0">
-                    Set
-                  </button>
-                </div>
-              </div>
-
-              {/* Conversions */}
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-3">
-                <span className="text-xs font-semibold tracking-widest text-white/40 uppercase">Conversion (this week)</span>
-                <div className="flex flex-col gap-2">
-                  {[
-                    { label: 'Analyzed → Listed', pct: weeklyData.analyzedListed, a: weeklyData.amz.productsListed, b: weeklyData.amz.productsAnalyzed },
-                    { label: 'Listed → Order',    pct: weeklyData.listedOrder,    a: weeklyData.amz.orders,          b: weeklyData.amz.productsListed   },
-                  ].map(c => (
-                    <div key={c.label} className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-white/8 bg-white/3">
-                      <div>
-                        <span className="text-xs text-white/50">{c.label}</span>
-                        <span className="text-[9px] text-white/45 ml-2">{c.a} / {c.b}</span>
-                      </div>
-                      <span className={`text-sm font-black tabular-nums ml-3 shrink-0 ${
-                        c.pct === null ? 'text-white/45' : c.pct >= 20 ? 'text-emerald-400' : c.pct >= 10 ? 'text-amber-400' : 'text-red-400'
-                      }`}>{c.pct !== null ? `${c.pct}%` : '—'}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Weekly totals */}
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-3">
-                <span className="text-xs font-semibold tracking-widest text-white/40 uppercase">This Week</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: 'Analyzed', value: weeklyData.amz.productsAnalyzed },
-                    { label: 'Listed',   value: weeklyData.amz.productsListed   },
-                    { label: 'Orders',   value: weeklyData.amz.orders            },
-                    { label: 'Revenue',  value: weeklyData.amz.revenue, prefix: '$' },
-                  ].map(item => (
-                    <div key={item.label} className="rounded-lg border border-white/8 bg-white/3 px-3 py-2 flex flex-col gap-0.5">
-                      <span className="text-[9px] text-white/50 uppercase tracking-widest">{item.label}</span>
-                      <span className="text-sm font-bold text-white/60 tabular-nums">
-                        {item.prefix}{item.value.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-            )
-          })()}
         </div>
       )}
 
@@ -2526,10 +2147,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
                 { label: 'Mtg Held', value: String(weeklyData.svc.meetingsHeld)          },
                 { label: 'Deals',    value: String(weeklyData.svc.deals)                 },
                 { label: 'Svc Rev',  value: `$${weeklyData.svc.revenue.toLocaleString()}` },
-                { label: 'Analyzed', value: String(weeklyData.amz.productsAnalyzed)      },
-                { label: 'Listed',   value: String(weeklyData.amz.productsListed)        },
-                { label: 'Orders',   value: String(weeklyData.amz.orders)                },
-                { label: 'Amz Rev',  value: `$${weeklyData.amz.revenue.toLocaleString()}` },
                 { label: 'Deep Wk',  value: fmtMin(weeklyData.dwMin)                    },
               ].map(item => (
                 <div key={item.label} className="rounded-lg border border-white/8 bg-white/3 px-2.5 py-2 flex flex-col gap-0.5">
@@ -2547,8 +2164,6 @@ export default function Motion({ settings, onSaveSettings }: Props) {
               { label: 'Email + Call → Meeting booked', pct: weeklyData.emailCallToMtg, a: weeklyData.svc.meetingsBooked, b: weeklyData.svc.emails + weeklyData.svc.calls },
               { label: 'Meeting booked → Meeting held', pct: weeklyData.mtgBookedHeld,  a: weeklyData.svc.meetingsHeld,   b: weeklyData.svc.meetingsBooked               },
               { label: 'Meeting held → Deal',           pct: weeklyData.mtgHeldDeal,    a: weeklyData.svc.deals,           b: weeklyData.svc.meetingsHeld                 },
-              { label: 'Analyzed → Listed',             pct: weeklyData.analyzedListed, a: weeklyData.amz.productsListed, b: weeklyData.amz.productsAnalyzed             },
-              { label: 'Listed → Order',                pct: weeklyData.listedOrder,    a: weeklyData.amz.orders,          b: weeklyData.amz.productsListed               },
             ].map(c => (
               <div key={c.label} className="flex items-center justify-between px-3 py-2 rounded-lg border border-white/8 bg-white/3">
                 <div>
@@ -2568,7 +2183,7 @@ export default function Motion({ settings, onSaveSettings }: Props) {
             <div className="grid grid-cols-2 gap-2">
               <PctCard label="Emails (wkdays)"   pct={weeklyData.emailsPct}   />
               <PctCard label="Calls (wkdays)"    pct={weeklyData.callsPct}    />
-              <PctCard label="Products (wknds)"  pct={weeklyData.productsPct} />
+              <PctCard label="Deals (wkdays)"    pct={weeklyData.dealsPct}    />
               <PctCard label="Deep Work (daily)" pct={weeklyData.dwPct}       />
             </div>
           </div>
@@ -2616,7 +2231,7 @@ export default function Motion({ settings, onSaveSettings }: Props) {
                 </div>
               ))}
             </div>
-          ) : weeklyData.emailsPct !== null || weeklyData.productsPct !== null ? (
+          ) : weeklyData.emailsPct !== null ? (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-500/15 bg-emerald-500/4">
               <span className="text-[10px] text-emerald-400/65">✓ No missed days this week</span>
             </div>
@@ -2637,12 +2252,11 @@ export default function Motion({ settings, onSaveSettings }: Props) {
                         ${w.totalRev.toLocaleString()}
                       </span>
                     </div>
-                    <div className="grid grid-cols-4 gap-1.5">
+                    <div className="grid grid-cols-3 gap-1.5">
                       {[
                         { label: 'Emails', value: w.svc.emails },
                         { label: 'Calls',  value: w.svc.calls  },
                         { label: 'Deals',  value: w.svc.deals  },
-                        { label: 'Amz',    value: w.amz.analyzed },
                       ].map(item => (
                         <div key={item.label} className="flex flex-col gap-0.5">
                           <span className="text-[8px] text-white/45 uppercase tracking-widest">{item.label}</span>
@@ -2656,7 +2270,7 @@ export default function Motion({ settings, onSaveSettings }: Props) {
             </div>
           )}
 
-          <p className="text-[9px] text-white/40 italic">Service = weekdays · Amazon = weekends · Today excluded · Week = Sun–Sat</p>
+          <p className="text-[9px] text-white/40 italic">Service + Deep Work metrics · Today excluded · Week = Sun–Sat</p>
         </div>
       )}
 

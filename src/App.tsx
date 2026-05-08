@@ -15,7 +15,6 @@ type Tab = 'home' | 'motion' | 'creed' | 'deen' | 'essentials'
 const INITIAL_SETTINGS: ExecutionSettings = {
   emailsPerDay:      25,
   callsPerDay:       5,
-  productsPerDay:    10,
   deepWorkMinPerDay: 120,
   lastUpdated:       '2026-03-17',
 }

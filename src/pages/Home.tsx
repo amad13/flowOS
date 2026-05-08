@@ -57,14 +57,13 @@ export default function Home() {
 
   // ── Real DB state ─────────────────────────────────────────────────────────
   const [monthRevSvc, setMonthRevSvc] = useState(0)
-  const [monthRevAmz, setMonthRevAmz] = useState(0)
   const [todaySalah,  setTodaySalah]  = useState(0)
   const [todayHabits, setTodayHabits] = useState<TodayHabits>({
     wake: false, sleep: false, morning: false, evening: false,
   })
 
   // ── Motion ────────────────────────────────────────────────────────────────
-  const motionRevenue = monthRevSvc + monthRevAmz
+  const motionRevenue = monthRevSvc
   const motionPct     = Math.min(100, Math.round(motionRevenue / MOTION_TARGET * 100))
   const motionDeficit = Math.max(0, MOTION_TARGET - motionRevenue)
   const motionStatus  = (motionPct >= 100 ? 'on_track' : motionPct >= 50 ? 'behind' : 'failing') as FlowStatus
@@ -184,18 +183,6 @@ export default function Home() {
       .then(({ data, error }) => {
         if (error) { console.error('[home] fetch service_records:', error); return }
         setMonthRevSvc((data ?? []).reduce((s, r) => s + (r.revenue ?? 0), 0))
-      })
-
-    // Motion: amazon_records for current month
-    supabase
-      .from('amazon_records')
-      .select('revenue')
-      .eq('user_id', user.id)
-      .gte('record_date', mStart)
-      .lt('record_date', mNext)
-      .then(({ data, error }) => {
-        if (error) { console.error('[home] fetch amazon_records:', error); return }
-        setMonthRevAmz((data ?? []).reduce((s, r) => s + (r.revenue ?? 0), 0))
       })
 
     // Deen: today's salah count
