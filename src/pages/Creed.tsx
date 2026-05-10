@@ -193,33 +193,42 @@ type CycleState = { currentIndex: number }
 
 // ─── Workout cycle ────────────────────────────────────────────────────────────
 const WORKOUT_CYCLE: WorkoutDef[] = [
+  // ── DAY 1 — PUSH (Chest + Shoulders + Triceps) ──────────────────────────────
   {
     name: 'PUSH', label: 'Push – Chest / Shoulders / Triceps', short: 'PUSH',
     exercises: [
-      { name: 'Incline Bench Press (Dumbbell)',   category: 'compound',  sets: 4 },
+      // Chest
+      { name: 'Incline DB Press',                 category: 'compound',  sets: 4 },
       { name: 'Bench Press (Dumbbell)',           category: 'compound',  sets: 3 },
-      { name: 'Low To High Cable Fly',            category: 'isolation', sets: 3 },
-      { name: 'Seated Overhead Press (Dumbbell)', category: 'compound',  sets: 3 },
-      { name: 'Lateral Raise (Dumbbell)',         category: 'isolation', sets: 3 },
-      { name: 'Lateral Raise (Machine)',          category: 'isolation', sets: 3 },
+      { name: 'High To Low Cable Fly',            category: 'isolation', sets: 3 },
+      { name: 'Low To High Cable Fly',            category: 'isolation', sets: 2 },
+      // Shoulders
+      { name: 'Seated Overhead Press (Dumbbell)', category: 'compound',  sets: 4 },
+      { name: 'Lateral Raise (Dumbbell)',         category: 'isolation', sets: 4 },
       { name: 'Reverse Fly (Cable)',              category: 'isolation', sets: 3 },
+      // Triceps
       { name: 'Triceps Extension (Cable)',        category: 'isolation', sets: 3 },
       { name: 'Triceps Pushdown Rope',            category: 'isolation', sets: 3 },
     ],
   },
+  // ── DAY 2 — PULL (Back + Biceps) ────────────────────────────────────────────
   {
     name: 'PULL', label: 'Pull – Back / Biceps', short: 'PULL',
     exercises: [
-      { name: 'Lat Pulldown (Cable)',              category: 'compound',  sets: 3 },
+      // Back
+      { name: 'Lat Pulldown (Cable)',              category: 'compound',  sets: 4 },
       { name: 'Seated Row (Cable)',                category: 'compound',  sets: 3 },
       { name: 'Incline Row (Dumbbell)',            category: 'compound',  sets: 3 },
-      { name: 'Low Cable Row To Hip (Single Arm)', category: 'compound',  sets: 3 },
       { name: 'Reverse Fly (Cable)',               category: 'isolation', sets: 3 },
+      { name: 'Shrug (Dumbbell)',                  category: 'isolation', sets: 2 },
+      // Biceps
       { name: 'Incline Curl (Dumbbell)',           category: 'isolation', sets: 3 },
-      { name: 'EZ-Bar Curl (Grip intermédiaire)',  category: 'isolation', sets: 3 },
+      { name: 'EZ-Bar Curl',                       category: 'isolation', sets: 3 },
       { name: 'Cable Curl (Standing)',             category: 'isolation', sets: 3 },
+      { name: 'Hammer Curl (Dumbbell)',            category: 'isolation', sets: 2 },
     ],
   },
+  // ── DAY 3 — LEGS Quads Focus ─────────────────────────────────────────────────
   {
     name: 'LEGS_QUADS', label: 'Legs – Quad Focus', short: 'LEGS-Q',
     exercises: [
@@ -228,40 +237,49 @@ const WORKOUT_CYCLE: WorkoutDef[] = [
       { name: 'Leg Extension (Machine)',           category: 'isolation',  sets: 3 },
       { name: 'Seated Leg Curl (Machine)',         category: 'isolation',  sets: 3 },
       { name: 'Hip Thrust (Machine)',              category: 'compound',   sets: 3 },
+      { name: 'Hip Adductor (Machine)',            category: 'abs_calves', sets: 3 },
+      { name: 'Hip Abductor (Machine)',            category: 'abs_calves', sets: 3 },
       { name: 'Standing Calf Raise (Dumbbell)',   category: 'abs_calves', sets: 3 },
       { name: 'Seated Calf Raise (Plate Loaded)', category: 'abs_calves', sets: 3 },
     ],
   },
+  // ── DAY 4 — CHEST-BACK ───────────────────────────────────────────────────────
   {
     name: 'CHEST_BACK', label: 'Chest & Back', short: 'CH/BACK',
     exercises: [
-      { name: 'Incline Bench Press (Dumbbell)',    category: 'compound',   sets: 3 },
-      { name: 'Bench Press (Dumbbell)',            category: 'compound',   sets: 3 },
-      { name: 'Low To High Cable Fly',             category: 'isolation',  sets: 3 },
-      { name: 'Incline Row (Dumbbell)',            category: 'compound',   sets: 3 },
-      { name: 'Low Cable Row To Hip (Single Arm)', category: 'compound',   sets: 3 },
-      { name: 'Reverse Fly (Cable)',               category: 'isolation',  sets: 3 },
-      { name: 'Lateral Raise (Cable)',             category: 'isolation',  sets: 2 },
-      { name: 'Crunch (Machine)',                  category: 'abs_calves', sets: 3 },
-      { name: 'Decline Crunch',                   category: 'abs_calves', sets: 3 },
+      // Chest
+      { name: 'Incline Bench Press (Dumbbell)',    category: 'compound',  sets: 4 },
+      { name: 'Bench Press (Dumbbell)',            category: 'compound',  sets: 3 },
+      { name: 'High To Low Cable Fly',             category: 'isolation', sets: 3 },
+      { name: 'Low To High Cable Fly',             category: 'isolation', sets: 2 },
+      // Back
+      { name: 'Lat Pulldown (Cable)',              category: 'compound',  sets: 4 },
+      { name: 'Incline Row (Dumbbell)',            category: 'compound',  sets: 3 },
+      { name: 'Low Cable Row To Hip (Single Arm)', category: 'compound',  sets: 3 },
+      { name: 'Reverse Fly (Cable)',               category: 'isolation', sets: 3 },
+      { name: 'Shrug (Dumbbell)',                  category: 'isolation', sets: 2 },
     ],
   },
+  // ── DAY 5 — SHOULDERS-ARMS ───────────────────────────────────────────────────
   {
     name: 'SHOULDERS_ARMS', label: 'Shoulders & Arms', short: 'SH/ARMS',
     exercises: [
-      { name: 'Seated Overhead Press (Dumbbell)', category: 'compound',   sets: 3 },
-      { name: 'Lateral Raise (Dumbbell)',         category: 'isolation',  sets: 3 },
-      { name: 'Lateral Raise (Machine)',          category: 'isolation',  sets: 3 },
+      // Shoulders
+      { name: 'Seated Overhead Press (Dumbbell)', category: 'compound',   sets: 4 },
+      { name: 'Lateral Raise (Machine)',          category: 'isolation',  sets: 4 },
       { name: 'Reverse Fly (Cable)',              category: 'isolation',  sets: 3 },
+      // Triceps
       { name: 'Triceps Extension (Cable)',        category: 'isolation',  sets: 3 },
       { name: 'Triceps Pushdown Rope',            category: 'isolation',  sets: 3 },
-      { name: 'Triceps Press',                   category: 'isolation',  sets: 2 },
+      // Biceps
       { name: 'Cable Curl (Standing)',            category: 'isolation',  sets: 3 },
       { name: 'Hammer Curl (Dumbbell)',           category: 'isolation',  sets: 3 },
-      { name: 'Crunch (Machine)',                 category: 'abs_calves', sets: 3 },
-      { name: 'Decline Crunch',                  category: 'abs_calves', sets: 3 },
+      // Core
+      { name: 'ABS Machine',                     category: 'abs_calves', sets: 3 },
+      { name: 'Hanging Knee Raise',              category: 'abs_calves', sets: 3 },
     ],
   },
+  // ── DAY 6 — LEGS Hamstrings Focus ────────────────────────────────────────────
   {
     name: 'LEGS_HAMSTRINGS', label: 'Legs – Hamstring Focus', short: 'LEGS-H',
     exercises: [
@@ -269,9 +287,13 @@ const WORKOUT_CYCLE: WorkoutDef[] = [
       { name: 'Romanian Deadlift (Barbell)',       category: 'compound',   sets: 4 },
       { name: 'Seated Leg Curl (Machine)',         category: 'isolation',  sets: 3 },
       { name: 'Hack Squat',                        category: 'compound',   sets: 3 },
-      { name: 'Glute Kickback (Machine)',          category: 'isolation',  sets: 3 },
+      { name: 'Hip Adductor (Machine)',            category: 'abs_calves', sets: 3 },
+      { name: 'Hip Abductor (Machine)',            category: 'abs_calves', sets: 3 },
       { name: 'Standing Calf Raise (Dumbbell)',   category: 'abs_calves', sets: 3 },
       { name: 'Seated Calf Raise (Plate Loaded)', category: 'abs_calves', sets: 3 },
+      // Core
+      { name: 'ABS Machine',                      category: 'abs_calves', sets: 3 },
+      { name: 'Hanging Knee Raise',               category: 'abs_calves', sets: 3 },
     ],
   },
 ]
