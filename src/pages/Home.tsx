@@ -14,7 +14,10 @@ import FlowPriorityCard from '../components/FlowPriorityCard'
 import StageStatusCard from '../components/StageStatusCard'
 import DisciplineCard from '../components/DisciplineCard'
 import FlowNotesCard from '../components/FlowNotesCard'
+import MomentumGraph from '../components/MomentumGraph'
 import { flowDisplayName, flowText } from '../data/flowColors'
+
+type HomeTab = 'overview' | 'momentum'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const MOTION_TARGET   = 3000
@@ -41,6 +44,7 @@ function getYesterday(): string {
 
 export default function Home() {
   const user      = useUser()
+  const [homeTab, setHomeTab] = useState<HomeTab>('overview')
   const today     = getToday()
   const yesterday = getYesterday()
   const mStart    = getMonthStart(today)
@@ -269,6 +273,26 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 border-b border-white/6 pb-3">
+        {([['overview', 'Overview'], ['momentum', 'Momentum']] as [HomeTab, string][]).map(([id, label]) => (
+          <button key={id} onClick={() => setHomeTab(id)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+              homeTab === id
+                ? 'bg-white/8 text-white/80 border border-white/12'
+                : 'text-white/35 hover:text-white/55'
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Momentum tab */}
+      {homeTab === 'momentum' && <MomentumGraph />}
+
+      {/* Overview tab */}
+      {homeTab === 'overview' && <>
+
       {/* Fullscreen focus timer */}
       {focusMode && blockStatus === 'running' && blockStartedAt !== null && (
         <FocusTimer
@@ -388,6 +412,8 @@ export default function Home() {
 
       {/* Row 5: Flow Notes */}
       <FlowNotesCard />
+
+      </>}
     </div>
   )
 }
