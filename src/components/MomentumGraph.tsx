@@ -587,15 +587,16 @@ export default function MomentumGraph() {
   // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return
+    const userId = user.id
     let cancelled = false
     async function load() {
       setLoading(true)
       const [{ data: nd, error: ne }, { data: ed, error: ee }] = await Promise.all([
         supabase.from('momentum_nodes')
           .select('id,title,status,flow,note,deadline,date_done,is_micro_action,position_x,position_y,order_index')
-          .eq('user_id', user.id).order('order_index'),
+          .eq('user_id', userId).order('order_index'),
         supabase.from('momentum_edges')
-          .select('id,source_id,target_id').eq('user_id', user.id),
+          .select('id,source_id,target_id').eq('user_id', userId),
       ])
       if (ne) console.error('[momentum] nodes:', ne)
       if (ee) console.error('[momentum] edges:', ee)
@@ -603,7 +604,7 @@ export default function MomentumGraph() {
       const nodes: DBNode[] = (nd ?? []) as DBNode[]
       const edges: DBEdge[] = (ed ?? []) as DBEdge[]
       if (nodes.length === 0) {
-        const seeded = await seedData(user.id)
+        const seeded = await seedData(userId)
         if (!cancelled) { setDbNodes(seeded.nodes); setDbEdges(seeded.edges) }
       } else {
         setDbNodes(nodes); setDbEdges(edges)
